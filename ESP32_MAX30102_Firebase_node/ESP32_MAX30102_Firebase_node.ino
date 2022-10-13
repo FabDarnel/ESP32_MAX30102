@@ -4,6 +4,7 @@
  * 1. https://randomnerdtutorials.com/esp32-firebase-realtime-database/
  * 2. https://medium.com/firebase-developers/getting-started-with-esp32-and-firebase-1e7f19f63401
  * 3. https://microcontrollerslab.com/max30102-pulse-oximeter-heart-rate-sensor-arduino/
+ * 4. https://randomnerdtutorials.com/esp32-ntp-client-date-time-arduino-ide/
  */
 
 // Import libraries 
@@ -15,6 +16,8 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <FirebaseESP32.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
 //Provide the token generation process info.
 #include "addons/TokenHelper.h"
@@ -34,6 +37,10 @@
 
 // Insert RTDB URLefine the RTDB URL */
 #define DATABASE_URL "*********" 
+
+// Define NTP Client to get time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP);
 
 // Define global variables 
 String device_location = "*********";  // input the location of your IoT Device
@@ -77,10 +84,16 @@ float beatsPerMinute;
 int beatAvg;
 float temperature; 
 
+// Variables to save date and time
+String formattedTime;
+String dayStamp;
+String timestamp;
+
 // JSON object to hold updated sensor values to be sent to be firebase
 FirebaseJson beatsPerMinute_json;
 FirebaseJson beatAvg_json;
 FirebaseJson temperature_json;
+FirebaseJson timestamp_json;
 
 void Wifi_Init()    // WiFi function which will be called in the setup() function 
 {
@@ -94,6 +107,33 @@ void Wifi_Init()    // WiFi function which will be called in the setup() functio
  Serial.print("Connected with IP: ");
  Serial.println(WiFi.localIP());
  Serial.println();
+}
+
+// Function to extract date and time 
+
+void timeCheck()
+{
+  while(!timeClient.update()) 
+  {
+    timeClient.forceUpdate();
+  }
+  // The formattedTime comes with the following format:
+  // 2018-05-28T16:00:13Z
+  // We need to extract date and time
+  formattedTime = timeClient.getFormattedTime();
+  Serial.println(formattedTime);
+
+  // Extract date
+  int splitT = formattedTime.indexOf("T");
+  dayStamp = formattedTime.substring(0, splitT);
+  Serial.print("DATE: ");
+  Serial.println(dayStamp);
+  // Extract time
+  timestamp = formattedTime.substring(splitT+1, formattedTime.length()-1);
+  timestamp_json.set("value", timestamp);
+  Serial.print("HOUR: ");
+  Serial.println(timestamp);
+  delay(1000);
 }
 
 void firebase_init() // Function to initialise Firebase
@@ -182,6 +222,15 @@ void setup()
   // Initialise firebase configuration and signup anonymously
   firebase_init();
 
+  // Initialize a NTPClient to get time
+  timeClient.begin();
+  // Set offset time in seconds to adjust for your timezone, for example:
+  // GMT +1 = 3600
+  // GMT +8 = 28800
+  // GMT -1 = -3600
+  // GMT 0 = 0
+  timeClient.setTimeOffset(0); // timestamp set to UTC 
+  
   // Initialize sensor
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
   {
@@ -227,7 +276,18 @@ void setup()
   // Print out initial temperature values
   String jsonStr3;
   temperature_json.toString(jsonStr3, true);
-  Serial.println(jsonStr3); 
+  Serial.println(jsonStr3);
+
+  timestamp_json.add("deviceuid", DEVICE_UID);
+  timestamp_json.add("name", "MAX30102-timestamp");
+  timestamp_json.add("type", "timestamp (UTC)");
+  timestamp_json.add("location", device_location);
+  timestamp_json.add("value", timestamp);
+
+  // Print out initial timestamp values
+  String jsonStr4;
+  timestamp_json.toString(jsonStr4, true);
+  Serial.println(jsonStr4); 
 }
 
 void uploadSensorData ()
@@ -239,6 +299,7 @@ void uploadSensorData ()
  String beatsPerMinute_node = databasePath + "/beatsPerMinute"; 
  String beatAvg_node = databasePath + "/beatAvg";
  String temperature_node = databasePath + "/temperature"; 
+ String timestamp_node = databasePath + "/timestamp";
  
  if (Firebase.setJSON(fbdo, beatsPerMinute_node.c_str(), beatsPerMinute_json))
  {
@@ -295,7 +356,25 @@ void uploadSensorData ()
   Serial.println("REASON: " + fbdo.errorReason());
   Serial.println("------------------------------------");
   Serial.println();
- } 
+ }
+ if (Firebase.setJSON(fbdo, timestamp_node.c_str(), timestamp_json))
+ {
+  Serial.println("PASSED"); 
+  Serial.println("PATH: " + fbdo.dataPath());
+  Serial.println("TYPE: " + fbdo.dataType());
+  Serial.println("ETag: " + fbdo.ETag());
+  Serial.print("VALUE: ");
+  printResult(fbdo); //see addons/RTDBHelper.h
+  Serial.println("------------------------------------");
+  Serial.println();
+ }
+ else
+ {
+  Serial.println("FAILED");
+  Serial.println("REASON: " + fbdo.errorReason());
+  Serial.println("------------------------------------");
+  Serial.println();
+ }  
   }
 }
 
@@ -303,5 +382,5 @@ void loop()
 {
   hrSensorRead();
   uploadSensorData();
-
+  timeCheck();
 }
