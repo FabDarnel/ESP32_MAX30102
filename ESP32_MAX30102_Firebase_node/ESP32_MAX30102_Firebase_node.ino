@@ -26,24 +26,24 @@
 #include "addons/RTDBHelper.h"
 
 // Device ID
-#define DEVICE_UID "*********" // The Unique ID helps to identify data coming from multiple sensors 
+#define DEVICE_UID "MAX30102" // The Unique ID helps to identify data coming from multiple sensors 
 
 // Insert your network credentials
-#define WIFI_SSID "*********"
-#define WIFI_PASSWORD "*********"
+#define WIFI_SSID "HUAWEI-M6j5"
+#define WIFI_PASSWORD "Vdzrk6J2"
 
 // Insert Firebase project API Key
-#define API_KEY "*********"
+#define API_KEY "AIzaSyAsH0xjucZChK7eEsZBhIeMrydnqGeXJqI"
 
 // Insert RTDB URLefine the RTDB URL */
-#define DATABASE_URL "*********" 
+#define DATABASE_URL "https://esp32-max30102-monitor-default-rtdb.firebaseio.com/" 
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 
 // Define global variables 
-String device_location = "*********";  // input the location of your IoT Device
+String device_location = "CD_HPC";  // Cote D'Or High Performance Centre 
 
 // Firebase Realtime Database Object
 FirebaseData fbdo; 
@@ -99,7 +99,8 @@ void Wifi_Init()    // WiFi function which will be called in the setup() functio
 {
  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
  Serial.print("Connecting to Wi-Fi");
- while (WiFi.status() != WL_CONNECTED){
+ while (WiFi.status() != WL_CONNECTED)
+ {
   Serial.print(".");
   delay(300);
   }
@@ -138,33 +139,33 @@ void timeCheck()
 
 void firebase_init() // Function to initialise Firebase
 {
-// configure firebase API Key
-config.api_key = API_KEY;
-// configure firebase realtime database url
-config.database_url = DATABASE_URL;
-// Enable WiFi reconnection 
-Firebase.reconnectWiFi(true);
-Serial.println("------------------------------------");
-Serial.println("Sign up new user...");
-// Sign in to firebase Anonymously
-if (Firebase.signUp(&config, &auth, "", ""))
-{
-Serial.println("Success");
- isAuthenticated = true;
-// Set the database path where updates will be loaded for this device
- databasePath = "/" + device_location;
- fuid = auth.token.uid.c_str();
-}
-else
-{
- Serial.printf("Failed, %s\n", config.signer.signupError.message.c_str());
- isAuthenticated = false;
-}
-// Assign the callback function for the long running token generation task, see addons/TokenHelper.h
-config.token_status_callback = tokenStatusCallback;
-// Initialise the firebase library
-Firebase.begin(&config, &auth);
-}
+  // configure firebase API Key
+  config.api_key = API_KEY;
+  // configure firebase realtime database url
+  config.database_url = DATABASE_URL;
+  // Enable WiFi reconnection 
+  Firebase.reconnectWiFi(true);
+  Serial.println("------------------------------------");
+  Serial.println("Sign up new user...");
+  // Sign in to firebase Anonymously
+  if (Firebase.signUp(&config, &auth, "", ""))
+  {
+    Serial.println("Success");
+    isAuthenticated = true;
+    // Set the database path where updates will be loaded for this device
+    databasePath = "/" + device_location;
+    fuid = auth.token.uid.c_str();
+  }
+  else
+    {
+    Serial.printf("Failed, %s\n", config.signer.signupError.message.c_str());
+    isAuthenticated = false;
+    }
+  // Assign the callback function for the long running token generation task, see addons/TokenHelper.h
+  config.token_status_callback = tokenStatusCallback;
+  // Initialise the firebase library
+  Firebase.begin(&config, &auth);
+  }
 
 void hrSensorRead() // Function to read sensor data Heart Rate & Temperature
 {
@@ -200,11 +201,10 @@ void hrSensorRead() // Function to read sensor data Heart Rate & Temperature
   Serial.print(beatAvg);
   Serial.print(", bodyTemperature=");
   Serial.print(temperature);
-
   beatsPerMinute_json.set("value", beatsPerMinute);
   beatAvg_json.set("value", beatAvg);
   temperature_json.set("value", temperature);
-
+  
   if (irValue < 50000)
     Serial.print(" No finger?");
 
@@ -229,12 +229,12 @@ void setup()
   // GMT +8 = 28800
   // GMT -1 = -3600
   // GMT 0 = 0
-  timeClient.setTimeOffset(0); // timestamp set to UTC 
-  
+  timeClient.setTimeOffset(0); // time set to UTC 
+
   // Initialize sensor
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
   {
-    Serial.println("MAX30102 was not found. Please check wiring/power. ");
+    Serial.println("MAX30102 not found. Please check wiring/power. ");
     while (1);
   }
   Serial.println("Place your index finger on the sensor with steady pressure.");
@@ -287,7 +287,8 @@ void setup()
   // Print out initial timestamp values
   String jsonStr4;
   timestamp_json.toString(jsonStr4, true);
-  Serial.println(jsonStr4); 
+  Serial.println(jsonStr4);
+
 }
 
 void uploadSensorData ()
@@ -300,7 +301,7 @@ void uploadSensorData ()
  String beatAvg_node = databasePath + "/beatAvg";
  String temperature_node = databasePath + "/temperature"; 
  String timestamp_node = databasePath + "/timestamp";
- 
+
  if (Firebase.setJSON(fbdo, beatsPerMinute_node.c_str(), beatsPerMinute_json))
  {
   Serial.println("PASSED"); 
@@ -356,7 +357,8 @@ void uploadSensorData ()
   Serial.println("REASON: " + fbdo.errorReason());
   Serial.println("------------------------------------");
   Serial.println();
- }
+ } 
+ 
  if (Firebase.setJSON(fbdo, timestamp_node.c_str(), timestamp_json))
  {
   Serial.println("PASSED"); 
@@ -374,7 +376,8 @@ void uploadSensorData ()
   Serial.println("REASON: " + fbdo.errorReason());
   Serial.println("------------------------------------");
   Serial.println();
- }  
+ } 
+
   }
 }
 
